@@ -12,7 +12,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 from omegaconf import OmegaConf, open_dict
-from orchrl.trainer.mate_dataproto_adapter import episodes_to_policy_batches
+from orchrl.trainer.mate_dataproto_adapter import episodes_to_policy_batches, tree_episodes_to_policy_batches
 from orchrl.trainer.mate_config import validate_mate_config
 from orchrl.trainer.mate_prompt_loader import MatePromptLoader
 from orchrl.trainer.mate_reward_bridge import build_reward_provider
@@ -255,7 +255,8 @@ class MultiAgentsPPOTrainer:
             max_response_length = next(iter(self.ppo_trainer_dict.values())).config.data.max_response_length
 
         role_names = list(self.agent_policy_mapping.keys()) if getattr(self, "agent_policy_mapping", None) else list(self.mate_config["role_policy_mapping"].keys())
-        return episodes_to_policy_batches(
+        adapter_fn = tree_episodes_to_policy_batches if self._mate_rollout_mode() == "tree" else episodes_to_policy_batches
+        return adapter_fn(
             episodes=episodes,
             tokenizer_dict=self.tokenizer_dict,
             role_policy_mapping=self.mate_config["role_policy_mapping"],
@@ -264,6 +265,11 @@ class MultiAgentsPPOTrainer:
             max_response_length=max_response_length,
             credit_assignment=self.mate_config.get("credit_assignment", self.mate_config.get("reward", {}).get("credit_assignment", "all_turns")),
         )
+
+    def _mate_rollout_mode(self) -> str:
+        if not self.mate_config:
+            return "parallel"
+        return str(self.mate_config.get("rollout_mode", "parallel"))
 
     def _require_expected_mate_policy_batches(self, gen_batch_output_per_policy):
         expected_policy_names = list(self.ppo_trainer_dict.keys())
@@ -843,7 +849,7 @@ class MultiAgentsPPOTrainer:
 
 
     def _validate(self, global_steps=0):
-        episodes = self._collect_mate_episodes(step_idx=global_steps)
+        episodes = self._flatten_validation_episodes(self._collect_mate_episodes(step_idx=global_steps))
         role_policy_mapping = self.mate_config.get("role_policy_mapping", {})
         role_names = list(role_policy_mapping.keys())
         total_rollout_num = len(episodes)
@@ -897,6 +903,20 @@ class MultiAgentsPPOTrainer:
             self._save_best_checkpoint(env_success_rate)
             
         return validation_metrics
+
+    def _flatten_validation_episodes(self, episodes):
+        if self._mate_rollout_mode() != "tree":
+            return episodes
+
+        flattened = []
+        for tree_episode in episodes:
+            flattened.append(tree_episode.pilot_result)
+            flattened.extend(
+                branch.episode_result
+                for branch in tree_episode.branch_results
+                if branch.episode_result.status == "success"
+            )
+        return flattened
     
     def _pad_dataproto_to_world_size(self, batch, world_sizes):
         batch, pad_size = pad_dataproto_to_divisor(batch, world_sizes)
