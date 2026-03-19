@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from trajectory import parallel as parallel_module
-from trajectory import pipe as pipe_module
-from trajectory.backend import InferenceBackend
-from trajectory.datatypes import (
+from orchrl.agent_trajectory_engine import parallel as parallel_module
+from orchrl.agent_trajectory_engine import pipe as pipe_module
+from orchrl.agent_trajectory_engine.backend import InferenceBackend
+from orchrl.agent_trajectory_engine.datatypes import (
     EpisodeResult,
     EpisodeTrajectory,
     InteractionRecord,
@@ -16,11 +16,9 @@ from trajectory.datatypes import (
     ModelResponse,
     TurnData,
 )
-from trajectory.parallel import parallel_rollout
-from trajectory.pipe import AgentPipeConfig
-from trajectory.reward import FunctionRewardProvider
-
-pytestmark = pytest.mark.asyncio
+from orchrl.agent_trajectory_engine.parallel import parallel_rollout
+from orchrl.agent_trajectory_engine.pipe import AgentPipeConfig
+from orchrl.agent_trajectory_engine.reward import FunctionRewardProvider
 
 
 class NoopBackend(InferenceBackend):
@@ -53,6 +51,7 @@ def _make_config() -> AgentPipeConfig:
     )
 
 
+@pytest.mark.asyncio
 async def test_parallel_rollout_unique_episode_ids_and_monitor_ports(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -153,6 +152,7 @@ async def test_parallel_rollout_unique_episode_ids_and_monitor_ports(
     assert len(set(state["ports"])) == 5
 
 
+@pytest.mark.asyncio
 async def test_parallel_rollout_respects_max_concurrent(monkeypatch: pytest.MonkeyPatch) -> None:
     state = {"active": 0, "max_active": 0, "idx": 0}
 
@@ -195,6 +195,7 @@ async def test_parallel_rollout_respects_max_concurrent(monkeypatch: pytest.Monk
     assert state["max_active"] == 2
 
 
+@pytest.mark.asyncio
 async def test_parallel_rollout_supports_prompt_batching(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeAgentPipe:
         def __init__(self, config: AgentPipeConfig, backend: InferenceBackend) -> None:
@@ -228,6 +229,7 @@ async def test_parallel_rollout_supports_prompt_batching(monkeypatch: pytest.Mon
     assert prompt_counts == {"q1": 3, "q2": 3, "q3": 3}
 
 
+@pytest.mark.asyncio
 async def test_parallel_rollout_collects_success_when_partial_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

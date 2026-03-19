@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import Any
 
-from .datatypes import InteractionRecord, ModelResponse
+from ..datatypes import InteractionRecord, ModelResponse
 
 
 def _messages_hash(messages: list[dict[str, Any]]) -> str:
@@ -40,6 +40,8 @@ class ReplayCache:
                 token_ids=record.token_ids,
                 logprobs=record.logprobs,
                 finish_reason=record.finish_reason,
+                prompt_ids=record.prompt_ids,
+                routed_experts=record.metadata.get("routed_experts"),
             )
             message_hashes[key] = _messages_hash(record.messages)
 

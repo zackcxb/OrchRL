@@ -4,8 +4,15 @@ from dataclasses import dataclass
 
 import pytest
 
+from orchrl.agent_trajectory_engine import (
+    BranchResult,
+    EpisodeResult,
+    EpisodeTrajectory,
+    TreeEpisodeResult,
+    TurnData,
+    VerlBackend,
+)
 from orchrl.trainer.mate_rollout_adapter import MateRolloutAdapter
-from trajectory import BranchResult, EpisodeResult, EpisodeTrajectory, TreeEpisodeResult, TurnData
 
 
 @dataclass
@@ -21,6 +28,10 @@ class _PromptLoader:
 class _RewardProvider:
     def compute(self, trajectory):
         return {"agent_rewards": {"verifier": 1.0}, "final_reward": 1.0}
+
+
+def test_agent_trajectory_engine_exports_verl_backend() -> None:
+    assert VerlBackend is not None
 
 
 def _turn(role: str, turn_index: int, timestamp: float) -> TurnData:

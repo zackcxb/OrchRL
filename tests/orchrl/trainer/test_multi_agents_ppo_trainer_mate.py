@@ -4,7 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from trajectory import BranchResult, EpisodeResult, EpisodeTrajectory, TreeEpisodeResult, TurnData
+from orchrl.agent_trajectory_engine import (
+    BranchResult,
+    EpisodeResult,
+    EpisodeTrajectory,
+    TreeEpisodeResult,
+    TurnData,
+)
 
 from orchrl.trainer.multi_agents_ppo_trainer import MultiAgentsPPOTrainer
 

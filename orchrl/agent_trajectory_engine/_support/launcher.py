@@ -50,7 +50,7 @@ class MASLauncher:
         temp_file = tempfile.NamedTemporaryFile(
             mode="w",
             suffix=".yaml",
-            prefix="trajectory_mas_",
+            prefix="mate_mas_",
             dir=str(self._work_dir) if self._work_dir else None,
             delete=False,
             encoding="utf-8",

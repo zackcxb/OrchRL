@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from trajectory import BranchResult, EpisodeResult, EpisodeTrajectory, TreeEpisodeResult, TurnData
+from orchrl.agent_trajectory_engine import (
+    BranchResult,
+    EpisodeResult,
+    EpisodeTrajectory,
+    TreeEpisodeResult,
+    TurnData,
+)
 
 from orchrl.trainer.mate_dataproto_adapter import tree_episodes_to_policy_batches
 
