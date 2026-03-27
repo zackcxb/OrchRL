@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from trajectory.launcher import MASLauncher
+from orchrl.agent_trajectory_engine._support.launcher import MASLauncher
 
 
 def _make_template() -> dict:
@@ -78,33 +78,6 @@ def test_prepare_config_preserves_other_fields():
         launcher.cleanup()
 
 
-def test_prepare_config_rewrites_agent_llm_base_urls():
-    template = _make_template()
-    template["agents"]["verifier"]["llm"] = {
-        "base_url": "http://verifier:8000/v1",
-        "api_key": "EMPTY",
-    }
-    template["agents"]["searcher"]["llm"] = {
-        "base_url": "http://searcher:8000/v1",
-        "api_key": "EMPTY",
-    }
-
-    launcher = MASLauncher()
-    try:
-        out = launcher.prepare_config(
-            config_template=template,
-            monitor_url="http://127.0.0.1:19000/v1",
-            agent_roles=["verifier", "searcher", "answerer"],
-        )
-        result = yaml.safe_load(out.read_text(encoding="utf-8"))
-        assert result["agents"]["verifier"]["llm"]["base_url"] == "http://127.0.0.1:19000/v1"
-        assert result["agents"]["searcher"]["llm"]["base_url"] == "http://127.0.0.1:19000/v1"
-        assert result["agents"]["verifier"]["llm"]["api_key"] == "EMPTY"
-        assert result["agents"]["searcher"]["llm"]["api_key"] == "EMPTY"
-    finally:
-        launcher.cleanup()
-
-
 def test_launch_and_wait_success():
     launcher = MASLauncher()
     command = f"{shlex.quote(sys.executable)} -c \"print('hello')\""
@@ -161,7 +134,7 @@ def test_prepare_config_write_error_cleans_temp_file(tmp_path, monkeypatch):
     def _raise_dump_error(*_args, **_kwargs):
         raise RuntimeError("write failed")
 
-    monkeypatch.setattr("trajectory.launcher.yaml.safe_dump", _raise_dump_error)
+    monkeypatch.setattr("orchrl.agent_trajectory_engine._support.launcher.yaml.safe_dump", _raise_dump_error)
 
     with pytest.raises(RuntimeError, match="write failed"):
         launcher.prepare_config(

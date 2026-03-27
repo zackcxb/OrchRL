@@ -1,7 +1,7 @@
 import pytest
 
-from trajectory.datatypes import EpisodeResult, EpisodeTrajectory, TurnData
-from trajectory.reward import FunctionRewardProvider, RewardWorker
+from orchrl.agent_trajectory_engine.datatypes import EpisodeResult, EpisodeTrajectory, TurnData
+from orchrl.agent_trajectory_engine.reward import FunctionRewardProvider, RewardWorker
 
 
 def _make_trajectory(roles: list[str]) -> EpisodeTrajectory:

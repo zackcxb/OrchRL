@@ -9,7 +9,10 @@ from aiohttp import web
 
 from .backend import BACKEND_URL_OVERRIDE_KEY, InferenceBackend
 from .datatypes import InteractionRecord, ModelMappingEntry, ModelRequest
-from .replay_cache import ReplayCache
+from ._support.diagnostics import build_drift_artifact
+from ._support.replay_cache import ReplayCache
+from ._support.renderer import ChatRenderer
+from ._support.validator import validate_runtime_request, validate_runtime_response
 
 
 class ModelMonitor:
@@ -19,11 +22,13 @@ class ModelMonitor:
         model_mapping: dict[str, ModelMappingEntry],
         episode_id: str | None = None,
         replay_cache: ReplayCache | None = None,
+        renderer: ChatRenderer | None = None,
     ) -> None:
         self._backend = backend
         self._model_mapping = model_mapping
         self._episode_id = episode_id or uuid.uuid4().hex
         self._replay_cache = replay_cache
+        self._renderer = renderer
 
         self._buffer: list[InteractionRecord] = []
         self._turn_counters: dict[str, int] = {}
@@ -113,6 +118,13 @@ class ModelMonitor:
             messages=messages,
             generation_params=generation_params,
         )
+        if self._renderer is not None and model_request.prompt_ids is None:
+            prompt_ids, render_fingerprint = self._renderer.render(
+                messages,
+                add_generation_prompt=True,
+            )
+            model_request.prompt_ids = prompt_ids
+            model_request.render_fingerprint = render_fingerprint
 
         response = None
         replayed = False
@@ -122,9 +134,37 @@ class ModelMonitor:
 
         if response is None:
             try:
+                if model_request.prompt_ids is not None:
+                    validate_runtime_request(model_request)
                 response = await self._backend.generate(model_request)
+                if model_request.prompt_ids is not None:
+                    validate_runtime_response(response)
             except Exception as exc:
                 return web.json_response({"error": str(exc)}, status=502)
+        elif model_request.prompt_ids is not None:
+            try:
+                validate_runtime_response(response)
+            except Exception as exc:
+                return web.json_response({"error": str(exc)}, status=502)
+
+        metadata = dict(getattr(response, "runtime_metadata", {}))
+        if response.routed_experts is not None:
+            metadata["routed_experts"] = response.routed_experts
+        if model_request.prompt_ids is not None:
+            metadata.setdefault(
+                "drift_artifact",
+                build_drift_artifact(
+                    messages=messages,
+                    runtime_prompt_ids=response.prompt_ids or model_request.prompt_ids,
+                    rerendered_prompt_ids=model_request.prompt_ids,
+                    response_ids=response.token_ids,
+                    response_logprobs=response.logprobs,
+                    render_fingerprint=model_request.render_fingerprint,
+                    sampling_fingerprint=model_request.sampling_fingerprint,
+                ),
+            )
+        if replayed:
+            metadata["replayed"] = True
 
         record = InteractionRecord(
             agent_role=agent_role,
@@ -137,7 +177,8 @@ class ModelMonitor:
             logprobs=response.logprobs,
             finish_reason=response.finish_reason,
             episode_id=self._episode_id,
-            metadata={"replayed": True} if replayed else {},
+            prompt_ids=getattr(response, "prompt_ids", None),
+            metadata=metadata,
         )
         with self._state_lock:
             if generation_snapshot == self._buffer_generation:
